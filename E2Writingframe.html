@@ -1,0 +1,712 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Digital Writing Frame - Long Answer English 2</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Merriweather:ital,wght@0,300;0,400;0,700;1,300;1,400&display=swap" rel="stylesheet">
+
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f8fafc;
+            color: #0f172a;
+        }
+
+        .editor-box {
+            font-family: 'Merriweather', serif;
+            min-height: 180px;
+            outline: none;
+            line-height: 1.7;
+        }
+        
+        .editor-box:focus {
+            ring: 2px;
+            ring-color: #3b82f6;
+        }
+
+        .editor-box[placeholder]:empty:before {
+            content: attr(placeholder);
+            color: #94a3b8;
+            font-style: italic;
+            font-family: 'Inter', sans-serif;
+        }
+
+        /* Starburst Canvas Overlay */
+        #starburst-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            pointer-events: none;
+            z-index: 9999;
+        }
+
+        /* Anti-paste notification toast animation */
+        @keyframes slideDown {
+            from { transform: translateY(-100%); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+        .toast-animate {
+            animation: slideDown 0.3s ease-out forwards;
+        }
+
+        /* Custom scrollbar for checklist sidebar */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+
+        /* Checklist item custom transitions */
+        .reminder-card {
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .reminder-card:hover {
+            transform: translateY(-1px);
+        }
+        .reminder-card.checked {
+            background-color: #f0fdf4;
+            border-color: #86efac;
+        }
+    </style>
+</head>
+<body class="h-screen flex flex-col overflow-hidden bg-slate-100 text-slate-800">
+
+    <!-- Canvas for Starburst Effects -->
+    <canvas id="starburst-canvas"></canvas>
+
+    <!-- Top Header / Bar (Compact margins to maximize editor space) -->
+    <header class="bg-slate-900 text-white px-3 py-2 flex items-center justify-between shadow-md shrink-0">
+        <div class="flex items-center space-x-3">
+            <div class="bg-blue-600 p-1.5 rounded-lg text-white">
+                <i class="fa-solid fa-pen-nib text-lg"></i>
+            </div>
+            <div>
+                <h1 class="font-bold text-base leading-tight tracking-tight text-white">English 2: Long Answer Frame</h1>
+                <p class="text-xs text-slate-400">Interactive Writing Workspace</p>
+            </div>
+        </div>
+
+        <!-- Global Stats & Quick Actions -->
+        <div class="flex items-center space-x-4 text-xs font-medium">
+            <div class="bg-slate-800 px-3 py-1.5 rounded-md border border-slate-700 flex items-center space-x-2">
+                <i class="fa-solid fa-file-lines text-blue-400"></i>
+                <span>Total Words: <strong id="total-word-count" class="text-blue-300">0</strong></span>
+            </div>
+            
+            <button onclick="confirmReset()" class="text-slate-400 hover:text-red-400 px-2 py-1 rounded transition-colors text-xs flex items-center space-x-1" title="Clear all text and reset frame">
+                <i class="fa-solid fa-rotate-left"></i>
+                <span class="hidden sm:inline">Reset</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- Floating Toast Warning for Paste Attempts -->
+    <div id="paste-toast" class="hidden fixed top-14 left-1/2 transform -translate-x-1/2 z-50 bg-amber-500 text-slate-950 font-semibold px-4 py-2.5 rounded-lg shadow-xl border border-amber-300 flex items-center space-x-3 text-sm">
+        <i class="fa-solid fa-triangle-exclamation text-lg"></i>
+        <span><strong>Pasting Disabled:</strong> Copying and pasting is not allowed. Please type out your own text!</span>
+        <button onclick="closePasteToast()" class="ml-2 text-slate-900 hover:text-slate-700 font-bold">✕</button>
+    </div>
+
+    <!-- Reset Confirmation Custom Modal -->
+    <div id="reset-modal" class="hidden fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+        <div class="bg-white rounded-lg p-5 max-w-sm w-full shadow-2xl border border-slate-200">
+            <h3 class="text-base font-bold text-slate-900 mb-2 flex items-center space-x-2">
+                <i class="fa-solid fa-triangle-exclamation text-amber-500"></i>
+                <span>Reset Workspace?</span>
+            </h3>
+            <p class="text-xs text-slate-600 mb-4">Are you sure you want to clear your task title, writing boxes, and checklists? This action cannot be undone.</p>
+            <div class="flex justify-end space-x-2">
+                <button onclick="closeResetModal()" class="px-3 py-1.5 text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded">Cancel</button>
+                <button onclick="executeReset()" class="px-3 py-1.5 text-xs font-semibold text-white bg-red-600 hover:bg-red-500 rounded">Yes, Reset All</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content Container with compact padding -->
+    <div class="flex-1 flex overflow-hidden p-1 sm:p-2 gap-2">
+
+        <!-- LEFT SIDEBAR: Clickable Checklist & Reminders (30% max width) -->
+        <aside class="w-72 md:w-80 lg:w-96 bg-white rounded-lg shadow-sm border border-slate-200 flex flex-col shrink-0 overflow-hidden">
+            <div class="p-3 bg-slate-50 border-b border-slate-200 flex justify-between items-center">
+                <div class="flex items-center space-x-2">
+                    <i class="fa-solid fa-list-check text-blue-600"></i>
+                    <h2 class="font-bold text-sm text-slate-800">Writing Reminders</h2>
+                </div>
+                <span id="reminders-progress" class="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-semibold">0/12 Done</span>
+            </div>
+
+            <!-- Scrollable List of Reminders -->
+            <div class="flex-1 overflow-y-auto p-2 space-y-4">
+
+                <!-- SECTION 1: Introduction Reminders -->
+                <div>
+                    <div class="flex items-center space-x-2 text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 px-1">
+                        <span class="w-2 h-2 rounded-full bg-blue-500"></span>
+                        <span>1. Introduction Checklist</span>
+                    </div>
+                    <div class="space-y-1.5">
+                        <label onclick="handleReminderClick(event, this)" class="reminder-card flex items-start space-x-2.5 p-2 rounded-md border border-slate-200 hover:border-blue-300 cursor-pointer text-xs select-none">
+                            <input type="checkbox" class="mt-0.5 accent-blue-600 rounded cursor-pointer pointer-events-none">
+                            <span class="text-slate-700 font-medium leading-snug">Read the task carefully</span>
+                        </label>
+                        <label onclick="handleReminderClick(event, this)" class="reminder-card flex items-start space-x-2.5 p-2 rounded-md border border-slate-200 hover:border-blue-300 cursor-pointer text-xs select-none">
+                            <input type="checkbox" class="mt-0.5 accent-blue-600 rounded cursor-pointer pointer-events-none">
+                            <span class="text-slate-700 font-medium leading-snug">Check instructional verbs</span>
+                        </label>
+                        <label onclick="handleReminderClick(event, this)" class="reminder-card flex items-start space-x-2.5 p-2 rounded-md border border-slate-200 hover:border-blue-300 cursor-pointer text-xs select-none">
+                            <input type="checkbox" class="mt-0.5 accent-blue-600 rounded cursor-pointer pointer-events-none">
+                            <span class="text-slate-700 font-medium leading-snug">Introduce the topic</span>
+                        </label>
+                        <label onclick="handleReminderClick(event, this)" class="reminder-card flex items-start space-x-2.5 p-2 rounded-md border border-slate-200 hover:border-blue-300 cursor-pointer text-xs select-none">
+                            <input type="checkbox" class="mt-0.5 accent-blue-600 rounded cursor-pointer pointer-events-none">
+                            <span class="text-slate-700 font-medium leading-snug">Hook the reader's attention</span>
+                        </label>
+                        <label onclick="handleReminderClick(event, this)" class="reminder-card flex items-start space-x-2.5 p-2 rounded-md border border-slate-200 hover:border-blue-300 cursor-pointer text-xs select-none">
+                            <input type="checkbox" class="mt-0.5 accent-blue-600 rounded cursor-pointer pointer-events-none">
+                            <span class="text-slate-700 font-medium leading-snug">Explain what to expect</span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- SECTION 2: Body Reminders -->
+                <div>
+                    <div class="flex items-center space-x-2 text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 px-1">
+                        <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+                        <span>2. Body Paragraphs Checklist</span>
+                    </div>
+                    <div class="space-y-1.5">
+                        <label onclick="handleReminderClick(event, this)" class="reminder-card flex items-start space-x-2.5 p-2 rounded-md border border-slate-200 hover:border-emerald-300 cursor-pointer text-xs select-none">
+                            <input type="checkbox" class="mt-0.5 accent-emerald-600 rounded cursor-pointer pointer-events-none">
+                            <span class="text-slate-700 font-medium leading-snug">Refer to provided material if relevant</span>
+                        </label>
+                        <label onclick="handleReminderClick(event, this)" class="reminder-card flex items-start space-x-2.5 p-2 rounded-md border border-slate-200 hover:border-emerald-300 cursor-pointer text-xs select-none">
+                            <input type="checkbox" class="mt-0.5 accent-emerald-600 rounded cursor-pointer pointer-events-none">
+                            <span class="text-slate-700 font-medium leading-snug">One clear point per paragraph</span>
+                        </label>
+                        <label onclick="handleReminderClick(event, this)" class="reminder-card flex items-start space-x-2.5 p-2 rounded-md border border-slate-200 hover:border-emerald-300 cursor-pointer text-xs select-none">
+                            <input type="checkbox" class="mt-0.5 accent-emerald-600 rounded cursor-pointer pointer-events-none">
+                            <span class="text-slate-700 font-medium leading-snug">Use linking words within and between paragraphs</span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- SECTION 3: Conclusion Reminders -->
+                <div>
+                    <div class="flex items-center space-x-2 text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 px-1">
+                        <span class="w-2 h-2 rounded-full bg-purple-500"></span>
+                        <span>3. Conclusion Checklist</span>
+                    </div>
+                    <div class="space-y-1.5">
+                        <label onclick="handleReminderClick(event, this)" class="reminder-card flex items-start space-x-2.5 p-2 rounded-md border border-slate-200 hover:border-purple-300 cursor-pointer text-xs select-none">
+                            <input type="checkbox" class="mt-0.5 accent-purple-600 rounded cursor-pointer pointer-events-none">
+                            <span class="text-slate-700 font-medium leading-snug">Summarize points</span>
+                        </label>
+                        <label onclick="handleReminderClick(event, this)" class="reminder-card flex items-start space-x-2.5 p-2 rounded-md border border-slate-200 hover:border-purple-300 cursor-pointer text-xs select-none">
+                            <input type="checkbox" class="mt-0.5 accent-purple-600 rounded cursor-pointer pointer-events-none">
+                            <span class="text-slate-700 font-medium leading-snug">Check consistency with Intro</span>
+                        </label>
+                        <label onclick="handleReminderClick(event, this)" class="reminder-card flex items-start space-x-2.5 p-2 rounded-md border border-slate-200 hover:border-purple-300 cursor-pointer text-xs select-none">
+                            <input type="checkbox" class="mt-0.5 accent-purple-600 rounded cursor-pointer pointer-events-none">
+                            <span class="text-slate-700 font-medium leading-snug">Conclude/reflect</span>
+                        </label>
+                        <label onclick="handleReminderClick(event, this)" class="reminder-card flex items-start space-x-2.5 p-2 rounded-md border border-slate-200 hover:border-purple-300 cursor-pointer text-xs select-none">
+                            <input type="checkbox" class="mt-0.5 accent-purple-600 rounded cursor-pointer pointer-events-none">
+                            <span class="text-slate-700 font-medium font-bold text-amber-700 leading-snug">No new information!</span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quick Tip Footer -->
+            <div class="p-2.5 bg-blue-50 border-t border-blue-100 text-[11px] text-blue-800 flex items-center space-x-2">
+                <i class="fa-solid fa-lightbulb text-blue-500 text-sm"></i>
+                <span>Click any box to mark complete & trigger instant feedback!</span>
+            </div>
+        </aside>
+
+        <!-- RIGHT AREA: Three Writing Editors + Submission (Flexible width, scrollable) -->
+        <main class="flex-1 bg-white rounded-lg shadow-sm border border-slate-200 flex flex-col overflow-hidden">
+            
+            <!-- Global Formatting Toolbar -->
+            <div class="px-3 py-1.5 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+                <div class="flex items-center space-x-1">
+                    <span class="text-xs font-semibold text-slate-500 mr-2">Formatting:</span>
+                    <button type="button" onclick="formatText('bold')" class="px-2.5 py-1 bg-white border border-slate-300 rounded hover:bg-slate-100 font-bold text-xs text-slate-800 shadow-sm transition" title="Bold Selected Text">
+                        <i class="fa-solid fa-bold"></i> Bold
+                    </button>
+                    <button type="button" onclick="formatText('italic')" class="px-2.5 py-1 bg-white border border-slate-300 rounded hover:bg-slate-100 italic text-xs text-slate-800 shadow-sm transition" title="Italicize Selected Text">
+                        <i class="fa-solid fa-italic"></i> Italic
+                    </button>
+                    <button type="button" onclick="formatText('removeFormat')" class="px-2 py-1 text-slate-500 hover:text-slate-800 text-xs rounded transition" title="Clear Formatting">
+                        <i class="fa-solid fa-eraser"></i>
+                    </button>
+                </div>
+
+                <div class="text-xs text-slate-400 italic">
+                    <i class="fa-solid fa-lock text-slate-400"></i> Direct Typing Only (Paste Disabled)
+                </div>
+            </div>
+
+            <!-- Scrollable Editors & Submission Container -->
+            <div class="flex-1 overflow-y-auto p-3 sm:p-4 space-y-4">
+
+                <!-- TASK NUMBER / TITLE FIELD -->
+                <div class="bg-blue-50/70 p-2.5 rounded-lg border border-blue-200/80 flex flex-col sm:flex-row items-start sm:items-center gap-2">
+                    <label for="task-title" class="text-xs font-bold text-blue-900 whitespace-nowrap flex items-center space-x-1.5 shrink-0">
+                        <i class="fa-solid fa-heading text-blue-600"></i>
+                        <span>Task Number / Title:</span>
+                    </label>
+                    <input type="text" id="task-title" placeholder="e.g. Task 2: Comparative Essay on Macbeth & Lord of the Flies" class="w-full text-sm font-semibold text-slate-800 bg-white border border-slate-300 rounded-md px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500 transition shadow-xs">
+                </div>
+
+                <!-- 1. INTRODUCTION BOX -->
+                <section class="border border-slate-200 rounded-lg overflow-hidden bg-white shadow-xs focus-within:border-blue-400 transition-all">
+                    <div class="bg-blue-50 px-3 py-2 border-b border-blue-100 flex justify-between items-center">
+                        <div class="flex items-center space-x-2">
+                            <span class="w-2.5 h-2.5 rounded-full bg-blue-600"></span>
+                            <h3 class="font-bold text-sm text-blue-900">Introduction</h3>
+                        </div>
+                        <span class="text-xs text-blue-700 bg-blue-100 px-2 py-0.5 rounded font-medium">
+                            Words: <span id="intro-words">0</span>
+                        </span>
+                    </div>
+                    <div class="p-3">
+                        <div id="intro-editor" 
+                             contenteditable="true" 
+                             class="editor-box text-sm text-slate-800 p-2 rounded min-h-[140px]" 
+                             placeholder="Write your introduction here. Hook your reader, introduce the topic, and outline your main argument..."
+                             oninput="updateWordCounts()"
+                             onpaste="preventPaste(event)"></div>
+                    </div>
+                </section>
+
+                <!-- 2. BODY BOX -->
+                <section class="border border-slate-200 rounded-lg overflow-hidden bg-white shadow-xs focus-within:border-emerald-400 transition-all">
+                    <div class="bg-emerald-50 px-3 py-2 border-b border-emerald-100 flex justify-between items-center">
+                        <div class="flex items-center space-x-2">
+                            <span class="w-2.5 h-2.5 rounded-full bg-emerald-600"></span>
+                            <h3 class="font-bold text-sm text-emerald-900">Body Paragraphs</h3>
+                        </div>
+                        <span class="text-xs text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded font-medium">
+                            Words: <span id="body-words">0</span>
+                        </span>
+                    </div>
+                    <div class="p-3">
+                        <div id="body-editor" 
+                             contenteditable="true" 
+                             class="editor-box text-sm text-slate-800 p-2 rounded min-h-[260px]" 
+                             placeholder="Write your body paragraphs here. Organize into clear paragraphs with linking words and refer to relevant texts..."
+                             oninput="updateWordCounts()"
+                             onpaste="preventPaste(event)"></div>
+                    </div>
+                </section>
+
+                <!-- 3. CONCLUSION BOX -->
+                <section class="border border-slate-200 rounded-lg overflow-hidden bg-white shadow-xs focus-within:border-purple-400 transition-all">
+                    <div class="bg-purple-50 px-3 py-2 border-b border-purple-100 flex justify-between items-center">
+                        <div class="flex items-center space-x-2">
+                            <span class="w-2.5 h-2.5 rounded-full bg-purple-600"></span>
+                            <h3 class="font-bold text-sm text-purple-900">Conclusion</h3>
+                        </div>
+                        <span class="text-xs text-purple-700 bg-purple-100 px-2 py-0.5 rounded font-medium">
+                            Words: <span id="conclusion-words">0</span>
+                        </span>
+                    </div>
+                    <div class="p-3">
+                        <div id="conclusion-editor" 
+                             contenteditable="true" 
+                             class="editor-box text-sm text-slate-800 p-2 rounded min-h-[140px]" 
+                             placeholder="Write your conclusion here. Summarize your key arguments, align with your introduction, and reflect on the topic without introducing new info..."
+                             oninput="updateWordCounts()"
+                             onpaste="preventPaste(event)"></div>
+                    </div>
+                </section>
+
+                <!-- 4. FINAL REVIEW & SUBMISSION FOOTER SECTION -->
+                <section class="border border-slate-300 rounded-lg overflow-hidden bg-gradient-to-br from-slate-900 to-slate-800 text-white p-4 shadow-md mt-6">
+                    <div class="flex items-center space-x-2 border-b border-slate-700 pb-2 mb-3">
+                        <i class="fa-solid fa-clipboard-check text-blue-400 text-lg"></i>
+                        <h3 class="font-bold text-base text-white">Final Review & Submission</h3>
+                    </div>
+                    
+                    <p class="text-xs text-slate-300 mb-3">Please verify the following final editing checks before downloading your document:</p>
+
+                    <!-- Verification Checkboxes -->
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-2 mb-4">
+                        <label class="flex items-center space-x-2.5 bg-slate-800/80 p-2.5 rounded-md border border-slate-700 cursor-pointer hover:border-slate-500 transition">
+                            <input type="checkbox" id="review-sentences" onchange="checkSubmissionReady()" class="w-4 h-4 accent-blue-500 rounded cursor-pointer">
+                            <span class="text-xs font-medium text-slate-200">I have written in complete sentences</span>
+                        </label>
+                        <label class="flex items-center space-x-2.5 bg-slate-800/80 p-2.5 rounded-md border border-slate-700 cursor-pointer hover:border-slate-500 transition">
+                            <input type="checkbox" id="review-grammar" onchange="checkSubmissionReady()" class="w-4 h-4 accent-blue-500 rounded cursor-pointer">
+                            <span class="text-xs font-medium text-slate-200">I have checked for common grammar mistakes</span>
+                        </label>
+                        <label class="flex items-center space-x-2.5 bg-slate-800/80 p-2.5 rounded-md border border-slate-700 cursor-pointer hover:border-slate-500 transition">
+                            <input type="checkbox" id="review-readthrough" onchange="checkSubmissionReady()" class="w-4 h-4 accent-blue-500 rounded cursor-pointer">
+                            <span class="text-xs font-medium text-slate-200">I have read through one more time</span>
+                        </label>
+                    </div>
+
+                    <!-- Download Controls & Document Details -->
+                    <div class="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2 border-t border-slate-700/60">
+                        <div class="text-xs text-slate-400">
+                            <span id="review-status" class="text-amber-400 font-semibold">⚠️ Complete the final review checks above to enable download.</span>
+                        </div>
+
+                        <div class="flex items-center space-x-2">
+                            <!-- Download Button -->
+                            <button id="download-btn" 
+                                    disabled 
+                                    onclick="downloadEssayRTF()" 
+                                    class="bg-blue-600 hover:bg-blue-500 disabled:bg-slate-700 disabled:text-slate-500 disabled:cursor-not-allowed text-white font-semibold text-sm px-5 py-2.5 rounded-md shadow-md flex items-center space-x-2 transition-all">
+                                <i class="fa-solid fa-file-word text-base"></i>
+                                <span>Download Document (.doc / .rtf)</span>
+                            </button>
+                        </div>
+                    </div>
+                </section>
+
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // ==========================================
+        // STARBURST CANVAS ANIMATION SYSTEM
+        // ==========================================
+        const canvas = document.getElementById('starburst-canvas');
+        const ctx = canvas.getContext('2d');
+        let particles = [];
+
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        class Particle {
+            constructor(x, y, color) {
+                this.x = x;
+                this.y = y;
+                this.color = color;
+                this.angle = Math.random() * Math.PI * 2;
+                this.speed = Math.random() * 6 + 2;
+                this.friction = 0.95;
+                this.gravity = 0.15;
+                this.size = Math.random() * 6 + 4;
+                this.alpha = 1;
+                this.decay = Math.random() * 0.02 + 0.015;
+                this.rotation = Math.random() * Math.PI;
+                this.rotationSpeed = (Math.random() - 0.5) * 0.2;
+                this.isStar = Math.random() > 0.3; // 70% star shape
+            }
+
+            update() {
+                this.speed *= this.friction;
+                this.x += Math.cos(this.angle) * this.speed;
+                this.y += Math.sin(this.angle) * this.speed + this.gravity;
+                this.alpha -= this.decay;
+                this.rotation += this.rotationSpeed;
+            }
+
+            draw() {
+                ctx.save();
+                ctx.globalAlpha = Math.max(0, this.alpha);
+                ctx.translate(this.x, this.y);
+                ctx.rotate(this.rotation);
+                ctx.fillStyle = this.color;
+
+                if (this.isStar) {
+                    // Draw 5-point Star Burst Shape
+                    ctx.beginPath();
+                    for (let i = 0; i < 5; i++) {
+                        ctx.lineTo(Math.cos((18 + i * 72) * Math.PI / 180) * this.size,
+                                   -Math.sin((18 + i * 72) * Math.PI / 180) * this.size);
+                        ctx.lineTo(Math.cos((54 + i * 72) * Math.PI / 180) * (this.size / 2),
+                                   -Math.sin((54 + i * 72) * Math.PI / 180) * (this.size / 2));
+                    }
+                    ctx.closePath();
+                    ctx.fill();
+                } else {
+                    // Draw Sparkle Circle
+                    ctx.beginPath();
+                    ctx.arc(0, 0, this.size / 2, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                ctx.restore();
+            }
+        }
+
+        function triggerStarburst(x, y) {
+            const colors = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#38bdf8', '#fbbf24'];
+            for (let i = 0; i < 35; i++) {
+                const randomColor = colors[Math.floor(Math.random() * colors.length)];
+                particles.push(new Particle(x, y, randomColor));
+            }
+        }
+
+        function animateParticles() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            for (let i = particles.length - 1; i >= 0; i--) {
+                particles[i].update();
+                particles[i].draw();
+                if (particles[i].alpha <= 0) {
+                    particles.splice(i, 1);
+                }
+            }
+            requestAnimationFrame(animateParticles);
+        }
+        animateParticles();
+
+        // ==========================================
+        // REMINDER CHECKLIST HANDLER
+        // ==========================================
+        function handleReminderClick(event, cardElement) {
+            // Toggle check status
+            const checkbox = cardElement.querySelector('input[type="checkbox"]');
+            checkbox.checked = !checkbox.checked;
+
+            if (checkbox.checked) {
+                cardElement.classList.add('checked');
+                
+                // Get click coordinates for Starburst effect
+                const rect = cardElement.getBoundingClientRect();
+                const starburstX = rect.left + rect.width / 2;
+                const starburstY = rect.top + rect.height / 2;
+                
+                triggerStarburst(starburstX, starburstY);
+            } else {
+                cardElement.classList.remove('checked');
+            }
+
+            updateReminderProgress();
+        }
+
+        function updateReminderProgress() {
+            const allCheckboxes = document.querySelectorAll('.reminder-card input[type="checkbox"]');
+            const checkedCount = document.querySelectorAll('.reminder-card input[type="checkbox"]:checked').length;
+            const progressBadge = document.getElementById('reminders-progress');
+            
+            progressBadge.textContent = `${checkedCount}/${allCheckboxes.length} Done`;
+            
+            if (checkedCount === allCheckboxes.length) {
+                progressBadge.className = "text-xs bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold animate-pulse";
+            } else {
+                progressBadge.className = "text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-semibold";
+            }
+        }
+
+        // ==========================================
+        // RICH TEXT FORMATTING (BOLD & ITALIC)
+        // ==========================================
+        function formatText(command) {
+            document.execCommand(command, false, null);
+        }
+
+        // ==========================================
+        // ANTI-PASTE ENFORCEMENT
+        // ==========================================
+        function preventPaste(event) {
+            event.preventDefault();
+            showPasteToast();
+        }
+
+        function showPasteToast() {
+            const toast = document.getElementById('paste-toast');
+            toast.classList.remove('hidden');
+            toast.classList.add('toast-animate');
+
+            // Auto-hide toast after 4 seconds
+            clearTimeout(window.toastTimer);
+            window.toastTimer = setTimeout(() => {
+                closePasteToast();
+            }, 4000);
+        }
+
+        function closePasteToast() {
+            const toast = document.getElementById('paste-toast');
+            toast.classList.add('hidden');
+        }
+
+        // ==========================================
+        // WORD COUNTER CALCULATIONS
+        // ==========================================
+        function countWords(text) {
+            const cleanText = text.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+            if (!cleanText) return 0;
+            return cleanText.split(' ').filter(word => word.length > 0).length;
+        }
+
+        function updateWordCounts() {
+            const introText = document.getElementById('intro-editor').innerText;
+            const bodyText = document.getElementById('body-editor').innerText;
+            const conclusionText = document.getElementById('conclusion-editor').innerText;
+
+            const introWords = countWords(introText);
+            const bodyWords = countWords(bodyText);
+            const conclusionWords = countWords(conclusionText);
+            const totalWords = introWords + bodyWords + conclusionWords;
+
+            document.getElementById('intro-words').textContent = introWords;
+            document.getElementById('body-words').textContent = bodyWords;
+            document.getElementById('conclusion-words').textContent = conclusionWords;
+            document.getElementById('total-word-count').textContent = totalWords;
+        }
+
+        // ==========================================
+        // FINAL REVIEW SUBMISSION CHECK
+        // ==========================================
+        function checkSubmissionReady() {
+            const checkSentences = document.getElementById('review-sentences').checked;
+            const checkGrammar = document.getElementById('review-grammar').checked;
+            const checkReadthrough = document.getElementById('review-readthrough').checked;
+            
+            const downloadBtn = document.getElementById('download-btn');
+            const reviewStatus = document.getElementById('review-status');
+
+            if (checkSentences && checkGrammar && checkReadthrough) {
+                downloadBtn.removeAttribute('disabled');
+                reviewStatus.textContent = "✓ Final review completed! Ready to download your document.";
+                reviewStatus.className = "text-emerald-400 font-semibold flex items-center gap-1";
+            } else {
+                downloadBtn.setAttribute('disabled', 'true');
+                reviewStatus.textContent = "⚠️ Complete all final review checks above to enable download.";
+                reviewStatus.className = "text-amber-400 font-semibold";
+            }
+        }
+
+        // ==========================================
+        // RTF / WORD DOCUMENT EXPORTER
+        // ==========================================
+        function convertHtmlToRtf(html) {
+            if (!html) return "";
+            
+            // Replace line breaks & paragraph breaks
+            let rtf = html
+                .replace(/<div><br><\/div>/gi, '\\par ')
+                .replace(/<div>/gi, '\\par ')
+                .replace(/<\/div>/gi, '')
+                .replace(/<br\s*\/?>/gi, '\\par ');
+
+            // Replace Bold tags
+            rtf = rtf.replace(/<b>(.*?)<\/b>/gi, '\\b $1\\b0 ')
+                     .replace(/<strong>(.*?)<\/strong>/gi, '\\b $1\\b0 ');
+
+            // Replace Italic tags
+            rtf = rtf.replace(/<i>(.*?)<\/i>/gi, '\\i $1\\i0 ')
+                     .replace(/<em>(.*?)<\/em>/gi, '\\i $1\\i0 ');
+
+            // Strip any remaining HTML tags safely
+            rtf = rtf.replace(/<[^>]*>/g, '');
+
+            // Escape special RTF characters
+            rtf = rtf.replace(/\\/g, '\\\\')
+                     .replace(/\{/g, '\\{')
+                     .replace(/\}/g, '\\}');
+
+            // Fix backslashes for RTF formatting tags
+            rtf = rtf.replace(/\\\\b /g, '\\b ')
+                     .replace(/\\\\b0 /g, '\\b0 ')
+                     .replace(/\\\\i /g, '\\i ')
+                     .replace(/\\\\i0 /g, '\\i0 ')
+                     .replace(/\\\\par /g, '\\par\n');
+
+            return rtf;
+        }
+
+        function downloadEssayRTF() {
+            const taskTitleInput = document.getElementById('task-title').value.trim();
+            const taskTitle = taskTitleInput || "English 2: Long Answer Submission";
+
+            const introHtml = document.getElementById('intro-editor').innerHTML;
+            const bodyHtml = document.getElementById('body-editor').innerHTML;
+            const conclusionHtml = document.getElementById('conclusion-editor').innerHTML;
+
+            const introRtf = convertHtmlToRtf(introHtml);
+            const bodyRtf = convertHtmlToRtf(bodyHtml);
+            const conclusionRtf = convertHtmlToRtf(conclusionHtml);
+
+            const totalWords = document.getElementById('total-word-count').textContent;
+            const dateStr = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+
+            // Formulate complete RTF document (Readable by Microsoft Word, Apple Pages, Google Docs, WordPad)
+            const rtfDocument = `{\\rtf1\\ansi\\deff0
+{\\fonttbl{\\f0\\fnil\\fcharset0 Arial;}}
+{\\colortbl ;\\red15\\green23\\blue42;\\red59\\green130\\blue246;}
+\\viewkind4\\uc1\\paperw11900\\paperh16840\\margl1440\\margr1440\\margt1440\\margb1440
+\\f0\\fs28\\b ${taskTitle}\\b0\\fs20\\par
+\\cf1 Date: ${dateStr} | Total Word Count: ${totalWords} words\\cf0\\par
+\\line
+\\fs24\\b\\cf2 1. INTRODUCTION\\cf0\\b0\\fs20\\par
+\\line
+${introRtf.trim() || "(No introduction provided)"}\\par
+\\line
+\\line
+\\fs24\\b\\cf2 2. BODY PARAGRAPHS\\cf0\\b0\\fs20\\par
+\\line
+${bodyRtf.trim() || "(No body paragraphs provided)"}\\par
+\\line
+\\line
+\\fs24\\b\\cf2 3. CONCLUSION\\cf0\\b0\\fs20\\par
+\\line
+${conclusionRtf.trim() || "(No conclusion provided)"}\\par
+\\line
+}`;
+
+            // Create blob and trigger download
+            const blob = new Blob([rtfDocument], { type: 'application/rtf' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            const safeFileName = (taskTitleInput || "English2_LongAnswer_Submission").replace(/[^a-zA-Z0-9_\-]/g, '_');
+            link.download = `${safeFileName}.doc`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(link.href);
+        }
+
+        // Reset workspace modal controls
+        function confirmReset() {
+            document.getElementById('reset-modal').classList.remove('hidden');
+        }
+
+        function closeResetModal() {
+            document.getElementById('reset-modal').classList.add('hidden');
+        }
+
+        function executeReset() {
+            document.getElementById('task-title').value = '';
+            document.getElementById('intro-editor').innerHTML = '';
+            document.getElementById('body-editor').innerHTML = '';
+            document.getElementById('conclusion-editor').innerHTML = '';
+            
+            document.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false);
+            document.querySelectorAll('.reminder-card').forEach(card => card.classList.remove('checked'));
+            
+            updateReminderProgress();
+            updateWordCounts();
+            checkSubmissionReady();
+            closeResetModal();
+        }
+    </script>
+</body>
+</html>
